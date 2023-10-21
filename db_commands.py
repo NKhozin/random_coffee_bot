@@ -6,7 +6,7 @@ import configparser
 from tabulate import tabulate
 
 config_obj = configparser.ConfigParser()
-config_obj.read("C:\\Users\\nkhozin\\Downloads\\jupyter_notebooks\\tula_hack\\configfile.ini")
+config_obj.read("configfile.ini")
 
 dbparam = config_obj["postgresql"]
 
