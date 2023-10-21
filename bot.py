@@ -14,6 +14,7 @@ import pandas as pd
 import random
 import re
 import configparser
+from tabulate import tabulate
 
 logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
@@ -21,7 +22,7 @@ logging.basicConfig(
 )
 
 config_obj = configparser.ConfigParser()
-config_obj.read("C:\\Users\\nkhozin\\Downloads\\jupyter_notebooks\\tula_hack\\configfile.ini")
+config_obj.read("configfile.ini")
 
 tg_bot = config_obj["tg_bot"]
 
@@ -59,25 +60,46 @@ async def start_coffee_time(update: Update, context: ContextTypes.DEFAULT_TYPE):
         for index, row in data.iterrows():
             member_id_1 = row.member_id_1
             member_id_2 = row.member_id_2
+            free_time = row.free_time.strftime('%Y-%m-%d %H:%M')
 
-            if will_by_a_meeting(member_id_1, member_id_2):
+            if will_be_a_meeting(member_id_1, member_id_2):
                 #print('Встреча будет')
+                continue
+            elif will_be_a_meeting_person(member_id_1, free_time) or will_be_a_meeting_person(member_id_2, free_time):
+                #print('Время занято')
                 continue
             elif was_a_meeting(member_id_1, member_id_2):
                 #print('Встреча уже была')
                 continue
             else:
-                free_time = row.free_time.strftime('%Y-%m-%d %H:%M')
                 insert_pairs(member_id_1, member_id_2)
                 pair_id = get_last_pair_id()
 
-                await context.bot.send_message(chat_id=update.effective_chat.id, text=f"Следующие участники Fandom-coffee {get_first_name(member_id_1)} и {get_first_name(member_id_2)} выбраны для встречи")
+                quot = '"'
+                href_1 = f"<a href={quot}tg://user?id={member_id_1}{quot}>{get_first_name(member_id_1)}</a>"
+                href_2 = f"<a href={quot}tg://user?id={member_id_2}{quot}>{get_first_name(member_id_2)}</a>"
+
+                await context.bot.send_message(chat_id=update.effective_chat.id, text=f"Следующие участники Fandom-coffee {href_1} и {href_2} выбраны для встречи", parse_mode=ParseMode.HTML)
 
                 free_random_room = choose_free_room(free_time)
 
                 if free_random_room:
+                    pre_text = f"Встреча успешно забронирована!\n"
                     text = insert_room(free_random_room, free_time, pair_id, member_id_1, member_id_2)
-                    await context.bot.send_message(chat_id=update.effective_chat.id, text=text)
+                    await context.bot.send_message(chat_id=update.effective_chat.id, text=pre_text+'<pre>'+text+'</pre>', parse_mode=ParseMode.HTML)
+
+                    pre_text = f"У вас предстощая встреча!\n"
+                    try:
+                        await context.bot.send_message(chat_id=member_id_1, text=pre_text+'<pre>'+text+'</pre>', parse_mode=ParseMode.HTML)
+                    except Exception as e:
+                        print(e)
+
+                    try:
+                        await context.bot.send_message(chat_id=member_id_2, text=pre_text+'<pre>'+text+'</pre>', parse_mode=ParseMode.HTML)
+                    except Exception as e:
+                        print(e)
+
+                    #Изменение статусов встреч как будто они успешно прошли
                     #text = change_meeting_status(pair_id, member_id_1, member_id_2)
                     #await context.bot.send_message(chat_id=update.effective_chat.id, text=text)
 
@@ -113,7 +135,7 @@ async def greet_chat_members(update: Update, context: ContextTypes.DEFAULT_TYPE)
 
     if not was_member and is_member:
         await update.effective_chat.send_message(
-            f"{member_name} добавился в наш чатик. Добро пожаловать! Введите удобное время для встречи. Например, '17:30-19:00, 20:00-20:30'",
+            f"{member_name} добавился в наш чатик. Добро пожаловать! \nВведите удобное время для встречи.\nНапример, '17:30-19:00, 20:00-20:30'\nДля получения уведомлений о встрече в личных сообщениях начните чат с https://t.me/tulahack_random_coffee_bot",
             parse_mode=ParseMode.HTML,
         )
         insert_members(member_id, first_name, username)
@@ -158,9 +180,25 @@ async def update_meetings_status(update: Update, context: ContextTypes.DEFAULT_T
     change_meeting_status_by_time()
     await context.bot.send_message(chat_id=update.effective_chat.id, text="Статусы встреч обновлены!")
 
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Команда для приветствия в личных сообщениях"""
+    await context.bot.send_message(chat_id=update.message.from_user.id, text="Привет! Здесь ты будешь получать уведомления о предстоящих встречах!")
+
+async def clear_history(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Команда для администратора, чтобы очистить прошедшие встречи"""
+    truncate_table('pairs')
+    truncate_table('rooms')
+    await context.bot.send_message(chat_id=update.effective_chat.id, text="Данные по прошедшим встречам удалены!")
+
 if __name__ == '__main__':
     application = ApplicationBuilder().token(token).build()
     application.add_handler(ChatMemberHandler(greet_chat_members, ChatMemberHandler.CHAT_MEMBER))
+
+    choose_handler = CommandHandler('start', start)
+    application.add_handler(choose_handler)
+
+    choose_handler = CommandHandler('clear_history', clear_history)
+    application.add_handler(choose_handler)
 
     choose_handler = CommandHandler('start_coffee_time', start_coffee_time)
     application.add_handler(choose_handler)
