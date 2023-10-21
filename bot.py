@@ -79,18 +79,18 @@ async def start_coffee_time(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 href_1 = f"<a href={quot}tg://user?id={member_id_1}{quot}>{get_first_name(member_id_1)}</a>"
                 href_2 = f"<a href={quot}tg://user?id={member_id_2}{quot}>{get_first_name(member_id_2)}</a>"
 
-                await context.bot.send_message(chat_id=update.effective_chat.id, text=f"Следующие участники Fandom-coffee {href_1} и {href_2} выбраны для встречи", parse_mode=ParseMode.HTML)
+                await context.bot.send_message(chat_id=update.effective_chat.id, text=f"Следующие участники Fandom-coffee {href_1} и {href_2} выбраны для встречи 😎", parse_mode=ParseMode.HTML)
 
                 free_random_room = choose_free_room(free_time)
 
                 if free_random_room:
-                    pre_text = f"Встреча успешно забронирована!\n"
+                    pre_text = f"Встреча успешно забронирована! ☕\n"
                     text = insert_room(free_random_room, free_time, pair_id, member_id_1, member_id_2)
-                    await context.bot.send_message(chat_id=update.effective_chat.id, text=pre_text+'<pre>'+text+'</pre>', parse_mode=ParseMode.HTML)
+                    await context.bot.send_message(chat_id=update.effective_chat.id, text=pre_text+'<pre>'+text+'</pre>'+'\n Приятного общения! ❤️', parse_mode=ParseMode.HTML)
 
-                    pre_text = f"У вас предстощая встреча!\n"
+                    pre_text = f"⭐ У вас предстощая встреча! ⭐\n"
                     try:
-                        await context.bot.send_message(chat_id=member_id_1, text=pre_text+'<pre>'+text+'</pre>', parse_mode=ParseMode.HTML)
+                        await context.bot.send_message(chat_id=member_id_1, text=pre_text+'<pre>'+text+'</pre>'+'\n Приятного общения! ❤️', parse_mode=ParseMode.HTML)
                     except Exception as e:
                         print(e)
 
@@ -105,7 +105,7 @@ async def start_coffee_time(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         await start_coffee_time(update, context)
     elif if_all_meets_completed_or_booked():
-        await context.bot.send_message(chat_id=update.effective_chat.id, text="Все возможные встречи забронированы или прошли!")
+        await context.bot.send_message(chat_id=update.effective_chat.id, text="Все возможные встречи забронированы или прошли! 😥")
     else:
         data = get_pairs_without_rooms()
         if not data.empty:
@@ -113,10 +113,10 @@ async def start_coffee_time(update: Update, context: ContextTypes.DEFAULT_TYPE):
             members_name = [get_first_name(i) for i in members_id]
             quot = '"'
             hrefs = [f"<a href={quot}tg://user?id={member_id}{quot}>{member_name}</a>" for member_id, member_name in zip(members_id, members_name)]
-            text = ', '.join(hrefs) + ' выберите, пожалуйста, другое время. Все свободные комнаты сейчас, к сожалению, заняты.'
+            text = ', '.join(hrefs) + ' выберите, пожалуйста, другое время. Все свободные комнаты сейчас, к сожалению, заняты. 😫'
             await context.bot.send_message(chat_id=update.effective_chat.id, text=text, parse_mode=ParseMode.HTML)
         else:
-            await context.bot.send_message(chat_id=update.effective_chat.id, text='Все возможные встречи прошли!')
+            await context.bot.send_message(chat_id=update.effective_chat.id, text='Все возможные встречи прошли!😥')
 
 async def greet_chat_members(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Приветствие новых пользователей, уведомление других пользователей о том, что кто-то покинул чат"""
@@ -135,13 +135,13 @@ async def greet_chat_members(update: Update, context: ContextTypes.DEFAULT_TYPE)
 
     if not was_member and is_member:
         await update.effective_chat.send_message(
-            f"{member_name} добавился в наш чатик. Добро пожаловать! \nВведите удобное время для встречи.\nНапример, '17:30-19:00, 20:00-20:30'\nДля получения уведомлений о встрече в личных сообщениях начните чат с https://t.me/tulahack_random_coffee_bot",
+            f"{member_name} добавился в наш чатик. Добро пожаловать! 🤩 \nВведите удобное время для встречи.\nНапример, '17:30-19:00, 20:00-20:30'\nДля получения уведомлений о встрече в личных сообщениях начните чат с https://t.me/tulahack_random_coffee_bot",
             parse_mode=ParseMode.HTML,
         )
         insert_members(member_id, first_name, username)
     elif was_member and not is_member:
         await update.effective_chat.send_message(
-            f"{member_name} покинул наш чатик.",
+            f"{member_name} покинул наш чатик 😭",
             parse_mode=ParseMode.HTML,
         )
         delete_members(member_id)
