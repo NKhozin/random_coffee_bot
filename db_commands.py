@@ -3,6 +3,7 @@ import sqlalchemy.exc
 import pandas as pd
 import random
 import configparser
+from tabulate import tabulate
 
 config_obj = configparser.ConfigParser()
 config_obj.read("C:\\Users\\nkhozin\\Downloads\\jupyter_notebooks\\tula_hack\\configfile.ini")
@@ -24,6 +25,14 @@ def drop_table(table_name):
     conn, engine = get_engine()
     cur = conn.cursor()
     cur.execute(f"DROP TABLE IF EXISTS {table_name}")
+    conn.commit()
+    conn.close()
+
+def truncate_table(table_name):
+    """Функция очистки таблицы по имени из БД"""
+    conn, engine = get_engine()
+    cur = conn.cursor()
+    cur.execute(f"TRUNCATE TABLE {table_name}")
     conn.commit()
     conn.close()
     
@@ -185,18 +194,15 @@ def insert_room(room_number, time_start, pair_id, member_id_1, member_id_2):
         cursor.execute(query)
         conn.commit()
 
-        text = f"Комната {room_number} успешно забронирована на {time_start} для встречи пары {pair_id} - ({get_first_name(member_id_1)}, {get_first_name(member_id_2)})"
+        quot = '"'
+        table = [['Дата', time_start], ['Участники', f'{get_first_name(member_id_1)} и {get_first_name(member_id_2)}'], ['Комната', room_number], ['Номер пары', pair_id]]
+        
+        text = tabulate(table)
         return text
     except (Exception,psycopg2.Error) as error:
         if(conn):
             str_error = f"""Failed to insert record into mobile table! Error:{error}"""
             return print(str_error)
-    finally:
-        if(conn):
-            cursor.close()
-            conn.close()
-            print("PostgreSQL connection is closed")
-            return text
     
 def get_last_pair_id():
     """Получение pair_id по последней добавленной паре. pair_id формируется автоматически в таблице при добавлении"""
@@ -220,7 +226,7 @@ def choose_free_room(time):
     """
     data = pd.read_sql_query(query, engine)
     
-    #Этим списком формируется количество свободных комнат и их номера.
+    #Этим списком формируется количество свободных комнат и их номера
     #all_room_numbers = [i for i in range(1,6)]
     all_room_numbers = [i for i in range(1,6)]
 
@@ -254,16 +260,23 @@ def check_if_all_meetings_happened(iteration):
 def get_free_time_and_pairs():
     """Функция получения из БД пар участников, у которых удобное время для встречь пересекается, при этом встречи не было или она не забронирована на будущее"""
     conn, engine = get_engine()
+
     query = """
-    with members_free_time as 
+    with pairs as (
+	select (member_id_1, member_id_2) as pairs_1, (member_id_2, member_id_1) as pairs_2, member_id_1, member_id_2, time_start
+	from pairs pa
+	left join rooms rm on rm.pair_id=pa.pair_id
+     ),
+members_free_time as 
     (
-        select distinct member_id, free_time
-        from members_free_time),
-    pairs as (
-        select (member_id_1, member_id_2) as pairs_1, (member_id_2, member_id_1) as pairs_2
-        from pairs
-        )
-    select *
+	select distinct m.member_id, m.free_time
+	from members_free_time m
+	left join pairs p1 on m.member_id=p1.member_id_1 and m.free_time=p1.time_start
+	left join pairs p2 on m.member_id=p2.member_id_2 and m.free_time=p2.time_start
+	where p1.member_id_1 is null
+	and p2.member_id_2 is null
+	)
+    select m.member_id_1, m.member_id_2, m.free_time
     from
         (select *, (member_id_1, member_id_2) as our_pairs
         from
@@ -272,7 +285,7 @@ def get_free_time_and_pairs():
             from members_free_time m1
             left join members_free_time m2 on m1.free_time=m2.free_time and m1.member_id!=m2.member_id
             where m2.member_id is not null)
-        where member_id_1!=member_id_2)
+        where member_id_1!=member_id_2) m
     where our_pairs not in (select pairs_1 from pairs)
     and our_pairs not in (select pairs_2 from pairs)
     order by free_time
@@ -297,14 +310,32 @@ def was_a_meeting(member_id_1, member_id_2):
     else:
         return False
     
-def will_by_a_meeting(member_id_1, member_id_2):
+def will_be_a_meeting_person(member_id, time):
+    """Проверка будет ли встреча у пользователя с кем-то в указанное время"""
+    conn, engine = get_engine()
+    query = f"""
+    select count(*) as cnt
+    from pairs p
+    left join rooms r on p.pair_id=r.pair_id
+    where (member_id_1={member_id} or member_id_2={member_id})
+    and happened is false
+    and time_start = '{time}'
+    """
+    data = pd.read_sql_query(query, engine)
+    cnt = data.cnt.to_list()[0]
+    if cnt>0:
+        return True
+    else:
+        return False
+
+def will_be_a_meeting(member_id_1, member_id_2):
     """Проверка будет ли встреча между member_id_1 и member_id_2"""
     conn, engine = get_engine()
     query = f"""
     select count(*) as cnt
     from pairs p
     left join rooms r on p.pair_id=r.pair_id
-    where (member_id_1 in ({member_id_1},{member_id_2}) or member_id_2 in ({member_id_1},{member_id_2}))
+    where (member_id_1 in ({member_id_1},{member_id_2}) and member_id_2 in ({member_id_1},{member_id_2}))
     and happened is false
     and time_start > NOW()
     """
