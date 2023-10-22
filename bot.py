@@ -29,7 +29,10 @@ tg_bot = config_obj["tg_bot"]
 token = tg_bot["token"]
 
 def extract_status_change(chat_member_update: ChatMemberUpdated) -> Optional[Tuple[bool, bool]]:
-    """Отислеживание изменений статусов участников чата"""
+    """Takes a ChatMemberUpdated instance and extracts whether the 'old_chat_member' was a member
+    of the chat and whether the 'new_chat_member' is a member of the chat. Returns None, if
+    the status didn't change.
+    """
     status_change = chat_member_update.difference().get("status")
     old_is_member, new_is_member = chat_member_update.difference().get("is_member", (None, None))
 
@@ -101,19 +104,23 @@ async def start_coffee_time(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     #await context.bot.send_message(chat_id=update.effective_chat.id, text=text)
 
         await start_coffee_time(update, context)
+    elif is_pairs_without_rooms():
+        data = get_pairs_without_rooms()
+        members_id = list(set(data.member_id_1.to_list()+data.member_id_2.to_list()))
+        members_name = [get_first_name(i) for i in members_id]
+        quot = '"'
+        hrefs = [f"<a href={quot}tg://user?id={member_id}{quot}>{member_name}</a>" for member_id, member_name in zip(members_id, members_name)]
+        text = ', '.join(hrefs) + ' выберите, пожалуйста, дополнительное время. Все свободные комнаты сейчас, к сожалению, заняты. 😫'
+        await context.bot.send_message(chat_id=update.effective_chat.id, text=text, parse_mode=ParseMode.HTML)
+    elif is_users_without_meets():
+        members_id = users_without_meets()
+        members_name = [get_first_name(i) for i in members_id]
+        quot = '"'
+        hrefs = [f"<a href={quot}tg://user?id={member_id}{quot}>{member_name}</a>" for member_id, member_name in zip(members_id, members_name)]
+        text = ', '.join(hrefs) + ' выберите, пожалуйста, дополнительное время. Вы совершили не все возможные встречи!'
+        await context.bot.send_message(chat_id=update.effective_chat.id, text=text, parse_mode=ParseMode.HTML)
     elif if_all_meets_completed_or_booked():
         await context.bot.send_message(chat_id=update.effective_chat.id, text="Все возможные встречи забронированы или прошли! 😥")
-    else:
-        data = get_pairs_without_rooms()
-        if not data.empty:
-            members_id = list(set(data.member_id_1.to_list()+data.member_id_2.to_list()))
-            members_name = [get_first_name(i) for i in members_id]
-            quot = '"'
-            hrefs = [f"<a href={quot}tg://user?id={member_id}{quot}>{member_name}</a>" for member_id, member_name in zip(members_id, members_name)]
-            text = ', '.join(hrefs) + ' выберите, пожалуйста, другое время. Все свободные комнаты сейчас, к сожалению, заняты. 😫'
-            await context.bot.send_message(chat_id=update.effective_chat.id, text=text, parse_mode=ParseMode.HTML)
-        else:
-            await context.bot.send_message(chat_id=update.effective_chat.id, text='Все возможные встречи прошли!😥')
 
 async def greet_chat_members(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Приветствие новых пользователей, уведомление других пользователей о том, что кто-то покинул чат"""
