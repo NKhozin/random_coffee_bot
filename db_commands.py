@@ -6,7 +6,7 @@ import configparser
 from tabulate import tabulate
 
 config_obj = configparser.ConfigParser()
-config_obj.read("configfile.ini")
+config_obj.read("C:\\Users\\nkhozin\\Downloads\\jupyter_notebooks\\tula_hack\\configfile.ini")
 
 dbparam = config_obj["postgresql"]
 
@@ -227,7 +227,6 @@ def choose_free_room(time):
     data = pd.read_sql_query(query, engine)
     
     #Этим списком формируется количество свободных комнат и их номера
-    #all_room_numbers = [i for i in range(1,6)]
     all_room_numbers = [i for i in range(1,6)]
 
     if data.empty:
@@ -370,6 +369,22 @@ def get_pairs_without_rooms():
     data = pd.read_sql_query(query, engine)
     return data
 
+def is_pairs_without_rooms():
+    """Есть ли пары, которые создались, но по которым не создалась комната по причине того, что они все заняты"""
+    conn, engine = get_engine()
+    query = """
+    select count(*) as cnt
+    from pairs p
+    left join rooms r on p.pair_id=r.pair_id
+    where happened is false
+    and r.pair_id is null
+    """
+    data = pd.read_sql_query(query, engine)
+    if data.cnt.to_list()[0] > 0:
+        return True
+    else:
+        return False
+
 def get_count_members():
     """Функция получения количества участников в чате"""
     conn, engine = get_engine()
@@ -403,6 +418,22 @@ def С(n, k):
     else:
         return 0
 
+def is_users_without_meets():
+    """Есть ли пользователи, которые не совершили все встречи"""
+    conn, engine = get_engine()
+    cur = conn.cursor()
+    query = """
+    select count(distinct m1.username) as cnt
+    from members m1 
+    INNER JOIN members m2 ON true
+    left join pairs p1 on p1.member_id_1=m1.member_id and p1.member_id_2=m2.member_id
+    left join pairs p2 on p2.member_id_2=m1.member_id and p2.member_id_1=m2.member_id
+    where (p1.member_id_1 is null and p2.member_id_1 is null)
+    and m1.member_id!=m2.member_id
+    """
+    data = pd.read_sql_query(query, engine)
+    return data.cnt.to_list()[0]
+
 def if_all_meets_completed_or_booked():
     """Проверка, что все возможные встречи забронированы или прошли"""
     n = get_count_members()
@@ -425,3 +456,19 @@ def change_meeting_status_by_time():
     cur.execute(query)
     conn.commit()
     conn.close()
+
+def users_without_meets():
+    """Получение пользователей, которые не совершили все встречи"""
+    conn, engine = get_engine()
+    cur = conn.cursor()
+    query = """
+    select distinct m1.member_id
+    from members m1 
+    INNER JOIN members m2 ON true
+    left join pairs p1 on p1.member_id_1=m1.member_id and p1.member_id_2=m2.member_id
+    left join pairs p2 on p2.member_id_2=m1.member_id and p2.member_id_1=m2.member_id
+    where (p1.member_id_1 is null and p2.member_id_1 is null)
+    and m1.member_id!=m2.member_id
+    """
+    data = pd.read_sql_query(query, engine)
+    return data.member_id.to_list()
